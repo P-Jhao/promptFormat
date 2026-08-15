@@ -3,10 +3,11 @@
 import { Bubble, Sender } from "@ant-design/x";
 import { useChat } from "@/hooks/useChat";
 import { useChatStore } from "@/store/chatStore";
-import { Plus, X } from "lucide-react";
+import { X } from "lucide-react";
+// import { Plus } from "lucide-react"; // 文件上传按钮暂时禁用
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { IMG_UPLOAD_URL } from "@/constants/config";
+// import { IMG_UPLOAD_URL } from "@/constants/config"; // 文件上传功能暂时禁用
 import type { MockConfig } from "@/types/mock";
 import { MockModeToggle } from "./MockModeToggle";
 import { ThoughtChain } from "./ThoughtChain";
@@ -26,19 +27,24 @@ export function ChatPanel() {
   const versions = useChatStore((state) => state.versions); // 获取版本历史
   const projectName = useChatStore((state) => state.projectName); // 获取项目名称
   const scrollRef = useRef<HTMLDivElement>(null);
+  /*
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [attachedFiles, setAttachedFiles] = useState<
     Array<{ id: string; url: string; name: string; type: "image" | "design" }>
   >([]);
   const [isUploading, setIsUploading] = useState(false);
+  */
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  /*
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<"info" | "warning" | "error">(
     "info",
   );
+  */
   const [inputValue, setInputValue] = useState(""); // ✨ 添加输入框状态
   const [mockConfig, setMockConfig] = useState<MockConfig>({ global: true });
 
+  /*
   useEffect(() => {
     if (toastMessage) {
       const timer = setTimeout(() => {
@@ -55,6 +61,7 @@ export function ChatPanel() {
     setToastMessage(msg);
     setToastType(type);
   };
+  */
 
   // 自动滚动到底部
   useEffect(() => {
@@ -64,8 +71,9 @@ export function ChatPanel() {
         behavior: "smooth",
       });
     }
-  }, [messages, isLoading, attachedFiles]);
+  }, [messages, isLoading /* attachedFiles: 上传功能暂时禁用 */]);
 
+  /*
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -148,10 +156,12 @@ export function ChatPanel() {
   const removeAttachment = (id: string) => {
     setAttachedFiles((prev) => prev.filter((f) => f.id !== id));
   };
+  */
 
   return (
     <div className="flex h-full flex-col relative">
-      {/* Toast Notification */}
+      {/*
+      Toast Notification（文件上传相关，暂时禁用）
       {toastMessage && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
           <div
@@ -167,6 +177,7 @@ export function ChatPanel() {
           </div>
         </div>
       )}
+      */}
 
       {/* Fullscreen Image Preview */}
       {previewImage && (
@@ -194,7 +205,8 @@ export function ChatPanel() {
         </div>
       )}
 
-      {/* Hidden File Input */}
+      {/*
+      Hidden File Input（文件上传相关，暂时禁用）
       <input
         type="file"
         ref={fileInputRef}
@@ -202,6 +214,7 @@ export function ChatPanel() {
         accept="image/*,.fig,.sketch,.xd,.psd"
         onChange={handleFileSelect}
       />
+      */}
 
       {/* Chat messages */}
 
@@ -369,7 +382,8 @@ export function ChatPanel() {
 
       {/* Prompt input */}
       <div className="shrink-0 border-t border-gray-200 p-2">
-        {/* Preview Area */}
+        {/*
+        Preview Area（文件上传相关，暂时禁用）
         {attachedFiles.length > 0 && (
           <div className="flex gap-2 mb-2 px-2 pt-2 overflow-x-auto">
             {attachedFiles.map((file) => (
@@ -407,52 +421,58 @@ export function ChatPanel() {
             ))}
           </div>
         )}
+        */}
 
         <MockModeToggle
           enabled={mockConfig.global}
           onChange={(global) => setMockConfig({ global })}
         />
 
+        {/*
+        Sender 上传 prefix（文件上传相关，暂时禁用）
+        prefix={
+          <button
+            className="text-gray-500 hover:text-gray-700 p-1 rounded-md hover:bg-gray-100 transition-colors"
+            onClick={() => {
+              const hasDesignFile = attachedFiles.some(
+                (f) => f.type === "design",
+              );
+              const hasImageFile = attachedFiles.some(
+                (f) => f.type === "image",
+              );
+
+              // 检测是否达到上限
+              if (hasDesignFile) {
+                showToast("最多只能上传 1 个设计文件", "warning");
+                return;
+              }
+
+              if (hasImageFile && attachedFiles.length >= 3) {
+                showToast("最多只能上传 3 张图片", "warning");
+                return;
+              }
+
+              fileInputRef.current?.click();
+            }}
+            disabled={isUploading}
+          >
+            {isUploading ? (
+              <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full" />
+            ) : (
+              <Plus size={18} />
+            )}
+          </button>
+        }
+        */}
+
         <Sender
           value={inputValue}
           onChange={setInputValue}
-          prefix={
-            <button
-              className="text-gray-500 hover:text-gray-700 p-1 rounded-md hover:bg-gray-100 transition-colors"
-              onClick={() => {
-                const hasDesignFile = attachedFiles.some(
-                  (f) => f.type === "design",
-                );
-                const hasImageFile = attachedFiles.some(
-                  (f) => f.type === "image",
-                );
-
-                // 检测是否达到上限
-                if (hasDesignFile) {
-                  showToast("最多只能上传 1 个设计文件", "warning");
-                  return;
-                }
-
-                if (hasImageFile && attachedFiles.length >= 3) {
-                  showToast("最多只能上传 3 张图片", "warning");
-                  return;
-                }
-
-                fileInputRef.current?.click();
-              }}
-              disabled={isUploading}
-            >
-              {isUploading ? (
-                <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full" />
-              ) : (
-                <Plus size={18} />
-              )}
-            </button>
-          }
           placeholder="今天你想构建什么样的应用？"
           loading={isLoading}
           onCancel={cancelMessage}
           onSubmit={(value) => {
+            /*
             if (!value?.trim() && attachedFiles.length === 0) return;
 
             // Map ui attachments to message attachments
@@ -469,6 +489,12 @@ export function ChatPanel() {
 
             // Clear attachments and input
             setAttachedFiles([]);
+            setInputValue(""); // ✨ 清空输入框
+            */
+
+            if (!value?.trim()) return;
+
+            sendMessage(value, undefined, mockConfig);
             setInputValue(""); // ✨ 清空输入框
           }}
         />
