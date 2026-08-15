@@ -48,7 +48,60 @@ nano backend/.env
 
 解析生效后，`promptforge.pjhao.xyz` 会指向这台 ECS。当前方案不需要 Sites 的 CNAME 或 TXT 记录。
 
-## 4. 构建依赖源与启动 HTTP 版本
+## 4. 本地构建镜像并上传到 ECS
+
+这台 ECS 只有 2 vCPU 和约 2 GiB 内存，推荐在本地 Docker Desktop 构建镜像，服务器只负责加载镜像和运行容器。下面的命令在 Windows PowerShell 中执行。
+
+先启动 Docker Desktop，然后在项目根目录执行：
+
+```powershell
+Set-Location "C:\path\to\promptFormat"
+
+docker compose build backend frontend nginx
+
+docker save --output .\promptforge-images.tar `
+  promptforge-backend:latest `
+  promptforge-frontend:latest `
+  promptforge-nginx:latest
+
+scp .\promptforge-images.tar root@47.97.98.39:/opt/promptforge/
+```
+
+`docker compose build` 默认使用中国大陆可访问性更好的 npm 镜像；需要切换 registry 时，可以在构建前设置：
+
+```powershell
+$env:NPM_REGISTRY = "https://registry.npmjs.org"
+docker compose build backend frontend nginx
+```
+
+上传完成后，在 ECS 上执行：
+
+```bash
+cd /opt/promptforge
+docker load --input ./promptforge-images.tar
+docker image ls --filter=reference='promptforge-*'
+docker compose up -d --no-build
+docker compose ps
+```
+
+`docker compose up -d --no-build` 会直接使用刚刚加载的三个镜像，不会在服务器上执行 `pnpm install` 或重新构建。确认启动成功后，可以删除服务器上的导出包释放空间：
+
+```bash
+rm -- ./promptforge-images.tar
+```
+
+不要把 `backend/.env` 放进压缩包或上传包，也不要把 `promptforge-images*.tar` 提交到 Git；导出包通常很大，根目录 `.gitignore` 已经忽略了这类文件。服务器仍需要单独配置 `backend/.env`，具体见第 2 节。
+
+如果仓库中的 Compose 配置还没有同步到服务器，先执行：
+
+```bash
+cd /opt/promptforge
+git pull --ff-only origin main
+```
+
+注意：`git pull` 只同步 Compose 和 Nginx 等配置，不会替代镜像上传；服务器必须先执行 `docker load`。
+
+## 5. 构建依赖源与启动 HTTP 版本
 
 Docker 构建默认使用中国大陆可访问性更好的 npm 镜像：
 
@@ -70,7 +123,7 @@ NPM_REGISTRY=https://registry.npmjs.org docker compose build frontend
 
 不设置 `NPM_REGISTRY` 时，会回退到 Dockerfile 和 Compose 中声明的默认镜像源。
 
-首次启动前端和后端：
+如果改为在服务器本地构建，首次启动前端和后端可以执行：
 
 ```bash
 docker compose build
@@ -94,7 +147,7 @@ docker compose logs --tail=100 frontend
 docker compose logs --tail=100 nginx
 ```
 
-## 5. 启用 HTTPS
+## 6. 启用 HTTPS
 
 可以使用阿里云 SSL 证书或 ACME 工具申请证书。将证书文件放到服务器上的以下路径：
 
@@ -114,19 +167,33 @@ docker compose up -d --force-recreate nginx
 
 证书续期后重新执行 `docker compose up -d --force-recreate nginx` 即可加载新证书。
 
-## 6. 更新版本
+## 7. 更新版本
+
+推荐的手动更新流程仍然是在本地重新构建并导出三个同名镜像，然后上传到服务器：
+
+```powershell
+docker compose build backend frontend nginx
+docker save --output .\promptforge-images.tar `
+  promptforge-backend:latest `
+  promptforge-frontend:latest `
+  promptforge-nginx:latest
+scp .\promptforge-images.tar root@47.97.98.39:/opt/promptforge/
+```
+
+服务器上执行：
 
 ```bash
 cd /opt/promptforge
-git pull
-docker compose build
-docker compose up -d
+git pull --ff-only origin main
+docker load --input ./promptforge-images.tar
+docker compose up -d --no-build
 docker image prune -f
+rm -- ./promptforge-images.tar
 ```
 
-`docker image prune -f` 只清理未被容器使用的悬空镜像；执行前仍建议确认服务器上没有其他重要的 Docker 工作负载依赖这些镜像。
+`docker image prune -f` 只清理未被容器使用的悬空镜像；执行前仍建议确认服务器上没有其他重要的 Docker 工作负载依赖这些镜像。更新过程中不会覆盖服务器上的 `backend/.env`。
 
-## 7. 本地开发
+## 8. 本地开发
 
 本地默认仍使用 Next rewrite：浏览器请求 `/api`，Next 将其转发到 `http://localhost:7001`。如需让浏览器直接访问其他 API 地址，可在前端构建/开发环境设置：
 
@@ -136,6 +203,6 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:7001/api
 
 这个变量会进入浏览器端代码，只能填写公开地址，不能填写 API Key。
 
-## 8. 公开接口保护
+## 9. 公开接口保护
 
 `POST /api/chat` 默认每个 IP 在 10 分钟内最多 5 次，同时限制每个 IP 只有 1 个生成请求在运行；单次请求还限制消息数量、提示词长度、JSON 体积，并在 SSE 长时间没有模型事件时发送心跳。限流状态只存在于当前后端进程，重启后会清空，不依赖数据库。

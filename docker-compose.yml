@@ -1,5 +1,6 @@
 services:
   backend:
+    image: promptforge-backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -34,6 +35,7 @@ services:
       start_period: 20s
 
   frontend:
+    image: promptforge-frontend:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -68,6 +70,7 @@ services:
       start_period: 30s
 
   nginx:
+    image: promptforge-nginx:latest
     build:
       context: ./deploy/nginx
       dockerfile: Dockerfile
