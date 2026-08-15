@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   title: "PromptForge | AI 前端工作台",
   description: "用自然语言生成并预览 React 前端项目",
   icons: {
-    icon: "/logo.png",
+    icon: "/logo.png?v=2",
   },
 };
 
