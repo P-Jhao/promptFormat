@@ -2,6 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { ChatMessage } from "@/types/message";
 import { generateAppStream } from "@/services/api";
 import { useChatStore } from "@/store/chatStore";
@@ -245,6 +246,7 @@ export function useChat() {
       });
 
       let streamFailed = false;
+      let hasShownMockWarning = false;
 
       try {
         // 3. 调用流式接口，传递版本化的 threadId
@@ -323,6 +325,13 @@ export function useChat() {
                   operation,
                   fileCount: Object.keys(filesPayload.files).length,
                 });
+
+                if (mockConfig.global && !hasShownMockWarning) {
+                  toast.warning(
+                    "当前项目使用模拟数据，如需真实项目体验，请关闭输入框中的 Mock 模式。",
+                  );
+                  hasShownMockWarning = true;
+                }
               }
             }
 
