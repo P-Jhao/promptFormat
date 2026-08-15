@@ -1,0 +1,5 @@
+.git
+certs
+www
+*.pem
+*.key

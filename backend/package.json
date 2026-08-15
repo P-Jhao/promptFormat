@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "start": "tsx ./bin/www.ts",
     "dev": "nodemon --exec tsx ./bin/www.ts"
   },

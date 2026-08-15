@@ -1,0 +1,97 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "7001"
+      TRUST_PROXY_HOPS: "1"
+      CORS_ORIGINS: "http://promptforge.pjhao.xyz,https://promptforge.pjhao.xyz"
+    expose:
+      - "7001"
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    networks:
+      - promptforge
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://127.0.0.1:7001/').then((response) =>
+          process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        BACKEND_URL: http://backend:7001
+        NEXT_PUBLIC_API_BASE_URL: /api
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+    expose:
+      - "3000"
+    restart: unless-stopped
+    init: true
+    networks:
+      - promptforge
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://127.0.0.1:3000/').then((response) =>
+          process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  nginx:
+    build:
+      context: ./deploy/nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/certs:/etc/nginx/certs:ro
+      - ./deploy/nginx/www:/var/www/certbot:ro
+    restart: unless-stopped
+    init: true
+    networks:
+      - promptforge
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O - http://127.0.0.1/healthz | grep -q '^ok$'
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  promptforge:
+    driver: bridge

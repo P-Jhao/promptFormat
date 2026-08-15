@@ -1,22 +1,22 @@
 import type { NextConfig } from "next";
 
+function resolveBackendUrl(): string {
+  const configuredBackendUrl = process.env.BACKEND_URL?.trim();
+
+  if (configuredBackendUrl === undefined || configuredBackendUrl.length === 0) {
+    return "http://localhost:7001";
+  }
+
+  return configuredBackendUrl.replace(/\/+$/, "");
+}
+
 const nextConfig: NextConfig = {
-  /* config options here */
-  images: {
-    remotePatterns: [
-      {
-        protocol: "http",
-        hostname: "localhost",
-        port: "8001",
-        pathname: "/images/**",
-      },
-    ],
-  },
+  output: "standalone",
   async rewrites() {
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:7001/api/:path*", // Proxy to Backend
+        destination: `${resolveBackendUrl()}/api/:path*`,
       },
     ];
   },

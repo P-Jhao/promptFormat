@@ -10,6 +10,10 @@ PromptForge 是一个聊天式的 AI 前端生成器：用户输入产品或页�
 - 后端：Node.js、TypeScript、Express、LangChain、LangGraph、Zod、Babel AST 工具、Multer、阿里云 OSS。
 - 生成模板：`backend/templates/react-ts/` 内置 React + TypeScript 项目模板，生成结果以 Sandpack 文件映射的形式返回浏览器。
 
+## 部署
+
+前后端同机 Docker Compose、Nginx 反向代理、域名解析和 HTTPS 配置请参阅 [DEPLOYMENT.md](DEPLOYMENT.md)。
+
 ## 目录结构
 
 ```text
@@ -92,6 +96,8 @@ cd backend
 pnpm start
 ```
 
+后端构建命令为 `pnpm build`，Docker 生产镜像会运行编译后的 `dist/bin/www.js`。
+
 前端生产构建与启动命令：
 
 ```bash
@@ -172,9 +178,9 @@ pnpm start
 
 ## 开发注意事项
 
-- 前端聊天请求和图片上传当前直接请求 `http://localhost:7001`；模板请求使用 `/api/template/react-ts`，并由 `frontend/next.config.ts` rewrite 到后端。更换后端地址时，需要同步检查 `frontend/src/constants/config.ts`、`frontend/src/services/api.ts` 和 `frontend/next.config.ts`。
+- 前端聊天和模板请求默认使用同源 `/api`；本地开发由 `frontend/next.config.ts` rewrite 到后端，生产环境由 Nginx 代理到后端。需要跨域开发时，可通过 `NEXT_PUBLIC_API_BASE_URL` 显式覆盖。
 - 建议从 `backend` 目录启动服务。组装节点会按当前工作目录读取 `templates/react-ts/`，从错误目录启动可能导致模板读取失败并触发内置降级模板。
 - `MOCK_MODE=true` 会覆盖客户端传入的 Mock 配置并强制全局 Mock；关闭后，前端 Mock 开关会通过请求体传给后端。
 - 后端当前 `RouteFlow` 只支持 `traditional`。前端代码中虽然保留了 Figma 流程的类型和展示配置，但后端对应适配器仍未注册，不应将其视为已完成的独立后端流程。
-- 后端使用 `cors()` 允许跨域，适合本地开发；部署时应根据实际前端域名收紧跨域策略。
+- 后端默认允许本地开发来源，并通过 `CORS_ORIGINS` 增加生产前端来源；生产 Compose 会配置 `https://promptforge.pjhao.xyz`。
 - 修改核心业务能力或关键目录结构时维护根目录 `AGENTS.md`；小改动、文案调整和临时修复不写入该文件。

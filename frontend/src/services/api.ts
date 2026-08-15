@@ -2,11 +2,12 @@
 import { ChatMessage } from "@/types/message";
 import { StreamEvent } from "@/types/api";
 import type { MockConfig } from "@/types/mock";
+import { apiUrl } from "@/constants/config";
 
 export async function getReactTS_Template(): Promise<
   Record<string, { code: string }>
 > {
-  const response = await fetch("/api/template/react-ts");
+  const response = await fetch(apiUrl("/template/react-ts"));
   if (!response.ok) {
     throw new Error("Failed to fetch template");
   }
@@ -35,8 +36,7 @@ export async function generateAppStream(
       return;
     }
 
-    // 临时直接连接后端，绕过 Next.js 代理以测试 SSE 问题
-    const response = await fetch("http://localhost:7001/api/chat", {
+    const response = await fetch(apiUrl("/chat"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -83,8 +83,8 @@ export async function generateAppStream(
         const chunk = decoder.decode(value, { stream: true });
         buffer += chunk;
 
-        // 处理 buffer 中的完整行 (SSE 以 \n\n 分隔)
-        const lines = buffer.split("\n\n");
+        // 处理 buffer 中的完整事件。Nginx/Node 可能使用 LF 或 CRLF。
+        const lines = buffer.split(/\r?\n\r?\n/);
         // 保留最后一个可能不完整的部分存回 buffer
         buffer = lines.pop() || "";
 

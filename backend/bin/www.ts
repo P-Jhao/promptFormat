@@ -14,7 +14,8 @@ const debug = debugModule("server:server");
  * Get port from environment and store in Express.
  */
 
-const port = normalizePort(process.env.PORT || "7001");
+const port = normalizePort(process.env.PORT ?? "7001");
+const host = resolveHost(process.env.HOST);
 app.set("port", port);
 
 /**
@@ -22,12 +23,19 @@ app.set("port", port);
  */
 
 const server = http.createServer(app);
+server.keepAliveTimeout = 65_000;
+server.headersTimeout = 66_000;
+server.requestTimeout = 16 * 60 * 1000;
 
 /**
  * Listen on provided port, on all network interfaces.
  */
 
-server.listen(port);
+if (typeof port === "string") {
+  server.listen(port);
+} else {
+  server.listen(port, host);
+}
 server.on("error", onError);
 server.on("listening", onListening);
 
@@ -35,7 +43,7 @@ server.on("listening", onListening);
  * Normalize a port into a number, string, or false.
  */
 
-function normalizePort(val: string): string | number | boolean {
+function normalizePort(val: string): string | number {
   const port = parseInt(val, 10);
 
   if (isNaN(port)) {
@@ -48,14 +56,21 @@ function normalizePort(val: string): string | number | boolean {
     return port;
   }
 
-  return false;
+  throw new Error(`Invalid port: ${val}`);
+}
+
+function resolveHost(value: string | undefined): string {
+  const normalizedValue = value?.trim();
+  return normalizedValue === undefined || normalizedValue.length === 0
+    ? "0.0.0.0"
+    : normalizedValue;
 }
 
 /**
  * Event listener for HTTP server "error" event.
  */
 
-function onError(error: any) {
+function onError(error: NodeJS.ErrnoException) {
   if (error.syscall !== "listen") {
     throw error;
   }
@@ -87,7 +102,8 @@ function onListening() {
     typeof addr === "string" ? "pipe " + addr : "port " + (addr?.port || "");
   debug("Listening on " + bind);
   console.log(
-    "Server is running at http://localhost:" +
-      (typeof addr === "string" ? addr : addr?.port)
+    `Server is running at http://${host}:${
+      typeof addr === "string" ? addr : addr?.port
+    }`,
   );
 }

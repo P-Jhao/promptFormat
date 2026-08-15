@@ -9,15 +9,40 @@ import {
 } from "../config/mock.js";
 import { NodeExecutionError } from "../agents/utils/nodeError.js";
 import { NODE_HANDLERS } from "../config/chat.js";
+import {
+  ChatValidationError,
+  parseChatRequest,
+} from "./chatValidation.js";
+import type { ChatRequestData } from "./chatValidation.js";
 
 const router = express.Router();
 
 type UnknownRecord = Record<string, unknown>;
 type FlushableResponse = Response & { flush?: () => void };
 
+const CHAT_REQUEST_TIMEOUT_MS = readPositiveInteger(
+  "CHAT_REQUEST_TIMEOUT_MS",
+  15 * 60 * 1000,
+);
+const SSE_HEARTBEAT_INTERVAL_MS = 15 * 1000;
+
 const agents: Record<RouteFlow, ReturnType<typeof buildAgent>> = {
   traditional: buildAgent("traditional"),
 };
+
+function readPositiveInteger(name: string, fallback: number): number {
+  const rawValue = process.env[name];
+  if (rawValue === undefined) {
+    return fallback;
+  }
+
+  const parsedValue = Number.parseInt(rawValue, 10);
+  if (!Number.isInteger(parsedValue) || parsedValue <= 0) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+
+  return parsedValue;
+}
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -48,21 +73,94 @@ function isMockConfig(value: unknown): value is MockConfig {
   );
 }
 
-router.post("/", async (req: Request, res: Response) => {
-  // 设置 SSE 响应头
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache, no-transform"); // no-transform 防止压缩
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no"); // 禁用 Nginx 等代理缓冲
-
-  // 立即发送头部
-  res.flushHeaders();
-
-  let streamCompleted = false;
+router.post("/", async (req: Request, res: Response): Promise<void> => {
+  let requestData: ChatRequestData | undefined;
 
   try {
-    const { messages, mockConfig: userMockConfig, projectId } = req.body;
-    console.log("Received messages count:", messages?.length);
+    requestData = parseChatRequest(req.body as unknown);
+  } catch (error: unknown) {
+    if (error instanceof ChatValidationError) {
+      res.status(error.statusCode).json({ error: error.message });
+      return;
+    }
+
+    res.status(500).json({ error: "Internal server error" });
+    return;
+  }
+
+  if (requestData === undefined) {
+    res.status(500).json({ error: "Internal server error" });
+    return;
+  }
+
+  let stopRequested = false;
+  let requestTimedOut = false;
+  let streamCompleted = false;
+  let sseStarted = false;
+  const abortController = new AbortController();
+
+  const handleDisconnect = (): void => {
+    stopRequested = true;
+    abortController.abort();
+  };
+
+  const writeSse = (payload: unknown): boolean => {
+    if (stopRequested || res.writableEnded || res.destroyed) {
+      return false;
+    }
+
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+    (res as FlushableResponse).flush?.();
+    return true;
+  };
+
+  const sendTimeout = (): void => {
+    requestTimedOut = true;
+    stopRequested = true;
+    abortController.abort();
+
+    if (!res.writableEnded && !res.destroyed) {
+      res.write(
+        `data: ${JSON.stringify({
+          type: "error",
+          data: { message: "Chat generation timed out" },
+          message: "Chat generation timed out",
+        })}\n\n`,
+      );
+      res.end();
+    }
+  };
+
+  req.once("aborted", handleDisconnect);
+  res.once("close", handleDisconnect);
+
+  const heartbeat = setInterval(() => {
+    if (!stopRequested && !res.writableEnded && !res.destroyed) {
+      res.write(": keep-alive\n\n");
+      (res as FlushableResponse).flush?.();
+    }
+  }, SSE_HEARTBEAT_INTERVAL_MS);
+  heartbeat.unref();
+
+  const timeout = setTimeout(sendTimeout, CHAT_REQUEST_TIMEOUT_MS);
+  timeout.unref();
+
+  try {
+    // Set SSE headers before any stream output so Nginx does not buffer this
+    // response as a normal JSON request.
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
+    sseStarted = true;
+
+    const {
+      messages,
+      mockConfig: userMockConfig,
+      projectId,
+    } = requestData;
+    console.log("Received messages count:", messages.length);
 
     // MOCK_MODE=true 时后端强制全局 Mock；否则使用客户端传入的有效配置。
     const clientMockConfig = isMockConfig(userMockConfig)
@@ -74,17 +172,18 @@ router.post("/", async (req: Request, res: Response) => {
         : clientMockConfig ?? DEFAULT_MOCK_PRESET;
     const mockConfig = resolveMockConfig(mockConfigInput);
 
-    // ========== 路由适配层：统一处理输入 ==========
     const routeResult = await resolveRouteAdapter({ messages, mockConfig });
     console.log(`📝 [Route] 使用 ${routeResult.flow} 流程`);
     console.log("Using mockConfig:", JSON.stringify(mockConfig));
 
-    // 发送初始为了建立连接的注释包（某些浏览器/代理需要先收到数据才认为连接成功）
+    if (stopRequested || res.writableEnded || res.destroyed) {
+      return;
+    }
     res.write(": keep-alive\n\n");
+    (res as FlushableResponse).flush?.();
 
-    // 使用 projectId 作为 thread_id 实现项目隔离
     const threadId =
-      projectId ||
+      projectId ??
       `project-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
     console.log("Using thread_id (projectId):", threadId);
@@ -92,26 +191,23 @@ router.post("/", async (req: Request, res: Response) => {
     const config = {
       configurable: { thread_id: threadId },
       streamMode: "updates" as const,
+      signal: abortController.signal,
     };
 
-    // ========== 选择 Agent 并构造输入 ==========
     const agent = agents[routeResult.flow];
-    const input = routeResult.input;
-
-    // 使用 stream 而不是 invoke
-    // streamMode: "updates" 会返回并通过 yield 输出每个节点的更新
-    const stream = await agent.stream(input, config);
+    const stream = await agent.stream(routeResult.input, config);
 
     for await (const chunk of stream) {
+      if (stopRequested) {
+        break;
+      }
+
       if (!isRecord(chunk)) {
         console.log("Unexpected stream chunk:", chunk);
         continue;
       }
 
-      const chunkRecord = chunk as UnknownRecord;
-      console.log("Chunk received keys:", Object.keys(chunkRecord));
-
-      // LangGraph 的 stream 块通常是 { [nodeName]: nodeOutput }
+      const chunkRecord: UnknownRecord = chunk as UnknownRecord;
       const nodeName = Object.keys(chunkRecord)[0];
       if (nodeName === undefined) {
         console.log("Empty stream chunk");
@@ -119,60 +215,65 @@ router.post("/", async (req: Request, res: Response) => {
       }
 
       const output = chunkRecord[nodeName];
-
       if (!isRecord(output)) {
         console.log("Empty output for node:", nodeName);
         continue;
       }
 
-      console.log("Processing node:", nodeName);
-      console.log("\n");
-
-      // 使用策略表处理节点输出
       const handler = NODE_HANDLERS[nodeName];
-
-      if (!handler) {
+      if (handler === undefined) {
         console.log(`Unknown node update: ${nodeName}`);
         continue;
       }
 
-      const eventType = handler.type;
       const payload = output[handler.key];
-
-      // 构造 SSE 消息
-      // 格式: data: {JSON}\n\n
-      const sseMessage = JSON.stringify({
-        type: eventType,
-        data: payload,
-      });
-      res.write(`data: ${sseMessage}\n\n`);
-
-      // 立即刷新缓冲区 (如果环境支持 flush)
-      (res as FlushableResponse).flush?.();
+      if (
+        !writeSse({
+          type: handler.type,
+          data: payload,
+        })
+      ) {
+        break;
+      }
     }
 
-    streamCompleted = true;
-  } catch (error) {
+    streamCompleted = !stopRequested && !requestTimedOut;
+  } catch (error: unknown) {
+    if (stopRequested || requestTimedOut) {
+      if (!res.writableEnded && !res.destroyed) {
+        res.end();
+      }
+      return;
+    }
+
     console.error("Error processing chat:", error);
     const node = error instanceof NodeExecutionError ? error.node : "unknown";
     const message =
       error instanceof Error ? error.message : "Internal server error";
 
-    // 图执行失败时只发送 error，不发送 done。
-    res.write(
-      `data: ${JSON.stringify({
-        type: "error",
-        data: { node, message },
-        message,
-      })}\n\n`,
-    );
-    res.end();
+    if (!sseStarted) {
+      res.status(500).json({ error: "Internal server error" });
+      return;
+    }
+
+    writeSse({
+      type: "error",
+      data: { node, message },
+      message,
+    });
+    if (!res.writableEnded && !res.destroyed) {
+      res.end();
+    }
     return;
+  } finally {
+    clearInterval(heartbeat);
+    clearTimeout(timeout);
+    req.removeListener("aborted", handleDisconnect);
+    res.removeListener("close", handleDisconnect);
   }
 
-  if (streamCompleted) {
-    // 只有图完整消费完毕后才发送结束信号。
-    res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
+  if (streamCompleted && !res.writableEnded && !res.destroyed) {
+    writeSse({ type: "done" });
     res.end();
   }
 });
