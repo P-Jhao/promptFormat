@@ -1,0 +1,40 @@
+name: Build Docker images
+
+on:
+  workflow_dispatch:
+
+env:
+  NPM_REGISTRY: https://registry.npmjs.org
+
+jobs:
+  build-images:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Prepare build environment
+        run: cp backend/.env.example backend/.env
+
+      - name: Build Docker images
+        run: docker compose build backend frontend nginx
+
+      - name: Export Docker images
+        run: |
+          docker save \
+            promptforge-backend:latest \
+            promptforge-frontend:latest \
+            promptforge-nginx:latest \
+            | gzip > promptforge-images.tar.gz
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: promptforge-images-${{ github.sha }}
+          path: promptforge-images.tar.gz
+          if-no-files-found: error
+          retention-days: 7
