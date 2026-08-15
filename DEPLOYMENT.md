@@ -48,7 +48,27 @@ nano backend/.env
 
 解析生效后，`promptforge.pjhao.xyz` 会指向这台 ECS。当前方案不需要 Sites 的 CNAME 或 TXT 记录。
 
-## 4. 启动 HTTP 版本
+## 4. 构建依赖源与启动 HTTP 版本
+
+Docker 构建默认使用中国大陆可访问性更好的 npm 镜像：
+
+```text
+https://registry.npmmirror.com
+```
+
+前端和后端的所有 `pnpm install` 都会使用这个源。需要切换到其他 registry 时，在构建时覆盖 `NPM_REGISTRY` 即可，例如：
+
+```bash
+NPM_REGISTRY=https://registry.npmjs.org docker compose build
+```
+
+也可以只构建单个服务：
+
+```bash
+NPM_REGISTRY=https://registry.npmjs.org docker compose build frontend
+```
+
+不设置 `NPM_REGISTRY` 时，会回退到 Dockerfile 和 Compose 中声明的默认镜像源。
 
 首次启动前端和后端：
 

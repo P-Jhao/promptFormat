@@ -3,6 +3,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     env_file:
       - ./backend/.env
     environment:
@@ -36,6 +38,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
         BACKEND_URL: http://backend:7001
         NEXT_PUBLIC_API_BASE_URL: /api
     environment:

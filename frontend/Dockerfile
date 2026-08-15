@@ -1,16 +1,20 @@
 FROM node:24-bookworm-slim AS base
 
+ARG NPM_REGISTRY=https://registry.npmmirror.com
 ENV PNPM_HOME=/pnpm
 ENV PATH=${PNPM_HOME}:${PATH}
+ENV NPM_CONFIG_REGISTRY=${NPM_REGISTRY}
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN corepack enable && corepack prepare pnpm@11.1.3 --activate
+RUN corepack enable \
+  && corepack prepare pnpm@11.1.3 --activate \
+  && pnpm config set registry "${NPM_REGISTRY}"
 WORKDIR /app
 
 FROM base AS dependencies
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --registry="${NPM_REGISTRY}"
 
 FROM dependencies AS builder
 
