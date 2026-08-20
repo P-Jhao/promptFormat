@@ -14,6 +14,10 @@ import {
   parseChatRequest,
 } from "./chatValidation.js";
 import type { ChatRequestData } from "./chatValidation.js";
+import {
+  processChatStreamChunk,
+  type ChatStreamState,
+} from "./chatStream.js";
 
 const router = express.Router();
 
@@ -28,6 +32,7 @@ const SSE_HEARTBEAT_INTERVAL_MS = 15 * 1000;
 
 const agents: Record<RouteFlow, ReturnType<typeof buildAgent>> = {
   traditional: buildAgent("traditional"),
+  chat: buildAgent("chat"),
 };
 
 function readPositiveInteger(name: string, fallback: number): number {
@@ -179,6 +184,11 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
     if (stopRequested || res.writableEnded || res.destroyed) {
       return;
     }
+
+    if (!writeSse({ type: "flow", data: { flow: routeResult.flow } })) {
+      return;
+    }
+
     res.write(": keep-alive\n\n");
     (res as FlushableResponse).flush?.();
 
@@ -188,18 +198,40 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
 
     console.log("Using thread_id (projectId):", threadId);
 
+    const streamMode: "updates" | Array<"messages" | "updates"> =
+      routeResult.flow === "chat" ? ["messages", "updates"] : "updates";
     const config = {
       configurable: { thread_id: threadId },
-      streamMode: "updates" as const,
+      streamMode,
       signal: abortController.signal,
     };
 
     const agent = agents[routeResult.flow];
-    const stream = await agent.stream(routeResult.input, config);
+    const stream = (await agent.stream(
+      routeResult.input,
+      config,
+    )) as AsyncIterable<unknown>;
+    const chatStreamState: ChatStreamState = {
+      mockReplySent: false,
+      textStreamed: false,
+    };
 
     for await (const chunk of stream) {
       if (stopRequested) {
         break;
+      }
+
+      if (routeResult.flow === "chat") {
+        if (
+          !processChatStreamChunk(
+            chunk,
+            chatStreamState,
+            writeSse,
+          )
+        ) {
+          break;
+        }
+        continue;
       }
 
       if (!isRecord(chunk)) {

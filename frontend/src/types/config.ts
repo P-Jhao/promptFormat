@@ -9,7 +9,7 @@ import type { StepType, Phase, FlowType } from "./flow";
 export interface FlowConfig {
   name: string;
   description: string;
-  initialStep: StepType;
+  initialStep?: StepType;
   phases: Phase[];
 }
 

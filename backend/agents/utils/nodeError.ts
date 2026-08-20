@@ -1,3 +1,5 @@
+import type { RunnableConfig } from "@langchain/core/runnables";
+
 export class NodeExecutionError extends Error {
   readonly node: string;
 
@@ -11,11 +13,14 @@ export class NodeExecutionError extends Error {
 
 export function withNodeError<TState, TResult>(
   node: string,
-  handler: (state: TState) => TResult | Promise<TResult>,
-): (state: TState) => Promise<TResult> {
-  return async (state: TState) => {
+  handler: (
+    state: TState,
+    config?: RunnableConfig,
+  ) => TResult | Promise<TResult>,
+): (state: TState, config?: RunnableConfig) => Promise<TResult> {
+  return async (state: TState, config?: RunnableConfig) => {
     try {
-      return await handler(state);
+      return await handler(state, config);
     } catch (error) {
       if (error instanceof NodeExecutionError) {
         throw error;

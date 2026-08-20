@@ -52,7 +52,6 @@ interface TraditionalGraphStateValue {
   messages: ChatMessage[];
   mockConfig: Record<string, boolean>;
   analysis?: AnalysisResult;
-  skipGeneration?: boolean;
   intent?: Intent | null;
   capabilities?: Capability | null;
   ui?: UI | null;
@@ -79,7 +78,6 @@ const TraditionalGraphState = Annotation.Root({
   }),
   mockConfig: Annotation<TraditionalGraphStateValue["mockConfig"]>(),
   analysis: Annotation<TraditionalGraphStateValue["analysis"]>(),
-  skipGeneration: Annotation<TraditionalGraphStateValue["skipGeneration"]>(),
   intent: Annotation<TraditionalGraphStateValue["intent"]>(),
   capabilities: Annotation<TraditionalGraphStateValue["capabilities"]>(),
   ui: Annotation<TraditionalGraphStateValue["ui"]>(),

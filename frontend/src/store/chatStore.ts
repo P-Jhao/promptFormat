@@ -111,6 +111,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
   addMessage: (message) =>
     set((state) => ({ messages: [...state.messages, message] })),
 
+  appendMessageContent: (messageId, delta) =>
+    set((state) => {
+      const message = state.messages.find((item) => item.id === messageId);
+      if (!message) {
+        throw new Error(`Cannot append content: message ${messageId} was not found`);
+      }
+
+      return {
+        messages: state.messages.map((item) =>
+          item.id === messageId
+            ? { ...item, content: `${item.content}${delta}` }
+            : item,
+        ),
+      };
+    }),
+
   setLoading: (loading) => set({ isLoading: loading }),
 
   addThought: (messageId, thought) =>

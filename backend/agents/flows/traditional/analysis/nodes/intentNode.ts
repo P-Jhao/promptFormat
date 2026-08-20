@@ -4,14 +4,19 @@ import { getStructuredModel } from "../../../../utils/model.js";
 import { tryExecuteMock } from "../../../../utils/mock.js";
 import { withRetry } from "../../../../utils/retry.js";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
+import type { ChatMessage } from "../../../../adapters/routeTypes.js";
 
-export async function intentNode(state: any) {
-  if (state.skipGeneration) {
-    console.log("[IntentNode] skipGeneration=true, skipping.");
-    return {
-      intent: null,
-    };
-  }
+interface IntentNodeState {
+  analysis?: {
+    summary?: string;
+    tags?: string[];
+    designAnalysis?: string | null;
+  };
+  messages?: ChatMessage[];
+  mockConfig: Record<string, boolean>;
+}
+
+export async function intentNode(state: IntentNodeState) {
 
   // MOCK MODE Handling
   const mockResult = await tryExecuteMock(

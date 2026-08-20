@@ -1,8 +1,41 @@
 // API 请求封装
 import { ChatMessage } from "@/types/message";
-import { StreamEvent } from "@/types/api";
+import type {
+  StreamErrorData,
+  StreamEvent,
+} from "@/types/api";
 import type { MockConfig } from "@/types/mock";
+import type { BackendFlowType, StepType } from "@/types/flow";
 import { apiUrl } from "@/constants/config";
+
+const STREAM_STEP_TYPES: readonly StepType[] = [
+  "analysis",
+  "intent",
+  "capabilities",
+  "ui",
+  "components",
+  "structure",
+  "dependency",
+  "types",
+  "utils",
+  "mockData",
+  "service",
+  "hooks",
+  "componentsCode",
+  "pagesCode",
+  "layouts",
+  "styles",
+  "app",
+  "files",
+  "figmaRawCode",
+  "figmaImageProcessed",
+  "figmaAstParsed",
+  "figmaBlockExtract",
+  "figmaGeometryGroup",
+  "figmaSectionNaming",
+  "figmaComponentGen",
+  "figmaAssembly",
+];
 
 export async function getReactTS_Template(): Promise<
   Record<string, { code: string }>
@@ -136,12 +169,53 @@ function isAbortError(error: unknown): boolean {
 }
 
 function isStreamEvent(value: unknown): value is StreamEvent {
-  if (typeof value !== "object" || value === null) {
+  if (!isRecord(value) || typeof value.type !== "string") {
     return false;
   }
 
-  const event = value as { type?: unknown };
-  return typeof event.type === "string";
+  if (value.type === "flow") {
+    return isRecord(value.data) && isBackendFlowType(value.data.flow);
+  }
+
+  if (value.type === "chat") {
+    return isRecord(value.data) && typeof value.data.delta === "string";
+  }
+
+  if (value.type === "error") {
+    return value.data === undefined || isStreamErrorData(value.data);
+  }
+
+  if (value.type === "done") {
+    return true;
+  }
+
+  return isStepType(value.type);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isBackendFlowType(value: unknown): value is BackendFlowType {
+  return value === "traditional" || value === "chat";
+}
+
+function isStepType(value: unknown): value is StepType {
+  return (
+    typeof value === "string" &&
+    STREAM_STEP_TYPES.includes(value as StepType)
+  );
+}
+
+function isStreamErrorData(value: unknown): value is StreamErrorData {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    (value.node === undefined || typeof value.node === "string") &&
+    (value.message === undefined || typeof value.message === "string")
+  );
 }
 
 /**

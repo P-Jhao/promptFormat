@@ -44,6 +44,7 @@ export interface ProjectVersion {
   versionId: string; // 版本唯一ID "v1", "v2", "v3"...
   versionNumber: number; // 版本号 1, 2, 3...
   threadId: string; // 对应的 LangGraph thread_id
+  assistantMessageId: string; // 关联生成该版本的 assistant 消息
 
   /** 版本元数据 */
   operation: "create" | "edit"; // 操作类型：创建 or 编辑
@@ -88,7 +89,7 @@ export interface ChatState {
   versions: ProjectVersion[]; // 版本历史列表
 
   /** 流程类型 */
-  currentFlow: FlowType | null; // 当前流程类型（traditional / figma）
+  currentFlow: FlowType | null; // 当前流程类型（traditional / chat / figma）
 
   messages: ChatMessage[]; // 纯消息数据，不含 thoughts
   messageThoughts: Record<string, ThoughtItem[]>; // messageId -> thoughts 映射
@@ -96,7 +97,7 @@ export interface ChatState {
   phaseCompletion: Record<string, { completed: number; total: number }>; // 阶段完成进度
 
   /** Flow Actions */
-  setCurrentFlow: (flow: FlowType) => void; // 设置当前流程类型
+  setCurrentFlow: (flow: FlowType | null) => void; // 设置当前流程类型
 
   /** Project Actions */
   createNewProject: (name?: string) => void; // 创建新项目
@@ -111,6 +112,7 @@ export interface ChatState {
 
   /** Actions */
   addMessage: (message: ChatMessage) => void;
+  appendMessageContent: (messageId: string, delta: string) => void;
   setLoading: (loading: boolean) => void;
 
   /** ThoughtChain Actions */

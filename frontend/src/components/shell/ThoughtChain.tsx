@@ -29,7 +29,7 @@ export function ThoughtChain({ thoughts }: ThoughtChainProps) {
   return (
     <div className="flex flex-col gap-3 p-3 bg-gray-50/50 rounded-lg border border-gray-100 max-w-full">
       {/* 流程类型标识 */}
-      {currentFlow && (
+      {currentFlow && currentFlow !== "chat" && (
         <div className="text-xs text-gray-500 flex items-center gap-2">
           <span
             className={`px-2 py-0.5 rounded ${

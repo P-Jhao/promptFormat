@@ -2,9 +2,6 @@
 import { z } from "zod";
 
 export const AnalysisSchema = z.object({
-  type: z
-    .enum(["CREATE", "QA", "CHIT_CHAT"])
-    .describe("用户的意图类型：创建新应用、修改现有应用、提问或闲聊"),
   summary: z.string().describe("针对用户需求的简要总结"),
   tags: z.array(z.string()).describe("相关的技术标签或关键词"),
   complexity: z

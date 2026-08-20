@@ -13,6 +13,11 @@ export const FLOW_CONFIG: Record<FlowType, FlowConfig> = {
     initialStep: "analysis",
     phases: ["planning", "foundation", "logic", "view", "assembly"],
   },
+  chat: {
+    name: "聊天",
+    description: "直接回答用户问题",
+    phases: [],
+  },
   figma: {
     name: "Figma 直连",
     description: "基于 Figma 设计稿的快速生成",
@@ -79,7 +84,7 @@ export const PHASE_NODES: Record<Phase, StepType[]> = {
 };
 
 /** 根据节点名称获取所属阶段（从 PHASE_NODES 反向计算） */
-export function getPhaseByNode(nodeName: StreamEventType): Phase | undefined {
+export function getPhaseByNode(nodeName: StepType): Phase | undefined {
   for (const [phase, nodes] of Object.entries(PHASE_NODES)) {
     if (nodes.includes(nodeName as StepType)) {
       return phase as Phase;
@@ -99,7 +104,7 @@ export function getFlowByStep(stepName: StepType): FlowType | undefined {
 // ============================================================================
 
 /** Traditional 流程步骤流转 */
-export const TRADITIONAL_STEP_MAP: Record<string, StreamEventType> = {
+export const TRADITIONAL_STEP_MAP: Record<string, StepType | "done"> = {
   analysis: "intent",
   intent: "capabilities",
   capabilities: "ui",
@@ -121,7 +126,7 @@ export const TRADITIONAL_STEP_MAP: Record<string, StreamEventType> = {
 };
 
 /** Figma 流程步骤流转 */
-export const FIGMA_STEP_MAP: Record<string, StreamEventType> = {
+export const FIGMA_STEP_MAP: Record<string, StepType | "done"> = {
   figmaRawCode: "figmaImageProcessed",
   figmaImageProcessed: "figmaAstParsed",
   figmaAstParsed: "figmaBlockExtract",
@@ -133,7 +138,7 @@ export const FIGMA_STEP_MAP: Record<string, StreamEventType> = {
 };
 
 /** 统一的步骤流转（合并两个流程，保留 NEXT_STEP_MAP 名称向后兼容） */
-export const NEXT_STEP_MAP: Record<string, StreamEventType> = {
+export const NEXT_STEP_MAP: Record<string, StepType | "done"> = {
   ...TRADITIONAL_STEP_MAP,
   ...FIGMA_STEP_MAP,
 };
@@ -142,7 +147,7 @@ export const NEXT_STEP_MAP: Record<string, StreamEventType> = {
  * LangGraph 节点名称到前端 thought key 的映射。
  * 后端错误事件携带的是图节点名称，而 thought 使用的是 SSE event type。
  */
-export const NODE_TO_STEP_MAP: Record<string, StreamEventType> = {
+export const NODE_TO_STEP_MAP: Record<string, StepType> = {
   // Traditional 流程节点
   analysisNode: "analysis",
   intentNode: "intent",

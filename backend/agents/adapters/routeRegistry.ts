@@ -11,26 +11,10 @@ import type {
   RouteAdapterResult,
   RouteInputAdapter,
 } from "./routeTypes.js";
-// import { modificationRouteAdapter } from "./modificationAdapter.js";
-// import { imageRouteAdapter } from "./imageAdapter.js";
-import { promptRouteAdapter } from "./promptAdapter.js";
-
-const fallbackRouteAdapter: RouteInputAdapter = {
-  name: "traditional-route",
-  priority: 10,
-  canHandle: () => true,
-  adapt: async ({ messages, mockConfig }) => ({
-    flow: "traditional",
-    input: { messages, mockConfig },
-    meta: { routeType: "fallback" },
-  }),
-};
+import { routeClassifierAdapter } from "./routeClassifierAdapter.js";
 
 const ROUTE_ADAPTERS: RouteInputAdapter[] = [
-  // modificationRouteAdapter,
-  // imageRouteAdapter,
-  promptRouteAdapter,
-  fallbackRouteAdapter,
+  routeClassifierAdapter,
 ].sort((a, b) => b.priority - a.priority);
 
 export async function resolveRouteAdapter(
@@ -45,6 +29,5 @@ export async function resolveRouteAdapter(
     }
   }
 
-  console.log("[RouteRegistry] Selected adapter: traditional-route (fallback)");
-  return await fallbackRouteAdapter.adapt(context);
+  throw new Error("No route adapter can handle the chat request");
 }

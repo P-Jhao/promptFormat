@@ -43,9 +43,6 @@ export const GraphSchema = z.object({
   // step0: 行为分析
   analysis: AnalysisSchema.optional(),
 
-  // step0.5: 控制流标记
-  skipGeneration: z.boolean().optional().describe("是否跳过代码生成流程"),
-
   // step1: 意图详情
   intent: IntentSchema.optional(),
 

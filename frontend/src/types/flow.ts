@@ -1,8 +1,11 @@
 // 流程类型定义
 // 将 Traditional 流程和 Figma 流程独立分离，方便后续扩展
 
-/** 流程类型 */
-export type FlowType = "traditional" | "figma";
+/** 后端当前可路由的流程类型 */
+export type BackendFlowType = "traditional" | "chat";
+
+/** 前端流程类型（保留 Figma 定义以兼容现有 UI 能力） */
+export type FlowType = BackendFlowType | "figma";
 
 // ============================================================================
 // Traditional 流程类型

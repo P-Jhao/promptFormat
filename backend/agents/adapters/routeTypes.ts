@@ -15,18 +15,22 @@ export interface ChatMessage {
   [key: string]: unknown;
 }
 
-export type RouteFlow = "traditional";
+export type RouteFlow = "traditional" | "chat";
 
-export interface TraditionalFlowInput {
+export interface RouteFlowInput {
   messages: ChatMessage[];
   mockConfig: Record<string, boolean>;
 }
 
-export interface RouteAdapterContext extends TraditionalFlowInput {}
+export type TraditionalFlowInput = RouteFlowInput;
+
+export type ChatFlowInput = RouteFlowInput;
+
+export interface RouteAdapterContext extends RouteFlowInput {}
 
 export interface RouteAdapterResult {
   flow: RouteFlow;
-  input: TraditionalFlowInput;
+  input: RouteFlowInput;
   meta?: Record<string, unknown>;
 }
 

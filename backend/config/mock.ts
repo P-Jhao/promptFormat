@@ -72,6 +72,8 @@ import "dotenv/config";
 
 /** 所有节点名称 */
 export type NodeName =
+  | "routeClassifier"
+  | "chatNode"
   | "analysisNode"
   | "intentNode"
   | "capabilityNode"
@@ -156,7 +158,11 @@ export interface MockConfig {
 // ============================================================================
 
 /** 所有节点名称列表 */
-const ALL_NODES: NodeName[] = Object.values(PHASE_NODES).flat();
+const ALL_NODES: NodeName[] = [
+  "routeClassifier",
+  "chatNode",
+  ...Object.values(PHASE_NODES).flat(),
+];
 
 /**
  * 将分层 MockConfig 解析为扁平的 Record<NodeName, boolean>

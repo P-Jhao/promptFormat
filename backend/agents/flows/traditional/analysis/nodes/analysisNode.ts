@@ -3,48 +3,35 @@ import { ANALYSIS_SYSTEM_PROMPT } from "../prompts/analysisPrompts.js";
 import { getStructuredModel } from "../../../../utils/model.js";
 import { tryExecuteMock } from "../../../../utils/mock.js";
 import { withRetry } from "../../../../utils/retry.js";
+import type { AnalysisResult } from "../schemas/analysisSchema.js";
 import {
   SystemMessage,
-  HumanMessage,
-  AIMessage,
   BaseMessage,
 } from "@langchain/core/messages";
+import type { ChatMessage } from "../../../../adapters/routeTypes.js";
+import { convertToLangChainMessages } from "../../../../adapters/routeHelpers.js";
 
-// 辅助函数：将前端消息格式转换为 LangChain 消息对象
-// 注意：只转换文字内容，不处理图片/设计稿（那是适配器的工作）
-async function convertToLangChainMessages(
-  rawMessages: any[],
-): Promise<BaseMessage[]> {
-  return rawMessages.map((msg) => {
-    // 只提取文字内容，忽略附件
-    const textContent =
-      typeof msg.content === "string" && msg.content.trim()
-        ? msg.content
-        : "用户上传了附件";
-
-    if (msg.role === "user") {
-      return new HumanMessage(textContent);
-    } else {
-      return new AIMessage(textContent);
-    }
-  });
+interface AnalysisNodeState {
+  messages: ChatMessage[];
+  mockConfig: Record<string, boolean>;
 }
 
-export const analysisNode = async (state: any) => {
+interface AnalysisNodeResult {
+  analysis: AnalysisResult;
+}
+
+export const analysisNode = async (
+  state: AnalysisNodeState,
+): Promise<AnalysisNodeResult> => {
   // MOCK MODE Handling
   const mockResult = await tryExecuteMock(
     state,
     "analysisNode",
     "analysisResult.json",
-    "analysis",
+    (data: unknown) => ({ analysis: AnalysisSchema.parse(data) }),
   );
-  if (mockResult) {
-    return {
-      ...mockResult,
-      skipGeneration:
-        mockResult.analysis?.type === "QA" ||
-        mockResult.analysis?.type === "CHIT_CHAT",
-    };
+  if (mockResult !== null) {
+    return mockResult as AnalysisNodeResult;
   }
 
   const structuredModel = getStructuredModel(AnalysisSchema);
@@ -55,7 +42,7 @@ export const analysisNode = async (state: any) => {
   if (state.messages && Array.isArray(state.messages)) {
     const lastMsg = state.messages[state.messages.length - 1];
     // 转换消息（只包含文字，不包含附件）
-    messages = await convertToLangChainMessages([lastMsg]);
+    messages = convertToLangChainMessages([lastMsg]);
   }
 
   const prompt = [new SystemMessage(ANALYSIS_SYSTEM_PROMPT), ...messages];
@@ -76,10 +63,9 @@ export const analysisNode = async (state: any) => {
   });
 
   console.log("--- User Message Analysis End ---");
-  console.log("📊 [AnalysisNode] 用户意图:", result.type);
+  console.log("📊 [AnalysisNode] 用户需求分析完成");
 
   return {
-    analysis: result,
-    skipGeneration: result.type === "QA" || result.type === "CHIT_CHAT",
+    analysis: AnalysisSchema.parse(result),
   };
 };

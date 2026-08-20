@@ -352,16 +352,10 @@ export function ChatPanel() {
             {/* Version Card Display - 为每个assistant消息显示对应版本 */}
             {msg.role === "assistant" &&
               (() => {
-                // 获取所有assistant消息
-                const assistantMessages = messages.filter(
-                  (m) => m.role === "assistant",
+                // 版本必须按 assistant 消息 ID 关联，不能依赖消息顺序。
+                const correspondingVersion = versions.find(
+                  (version) => version.assistantMessageId === msg.id,
                 );
-                // 找到当前消息在assistant消息列表中的索引
-                const messageIndex = assistantMessages.findIndex(
-                  (m) => m.id === msg.id,
-                );
-                // 获取对应索引的版本
-                const correspondingVersion = versions[messageIndex];
 
                 // 如果找到了对应的版本，显示版本卡片
                 if (correspondingVersion) {
